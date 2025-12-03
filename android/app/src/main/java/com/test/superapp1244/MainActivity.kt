@@ -1,4 +1,4 @@
-package com.testsuperapp
+package com.test.superapp1244
 
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate

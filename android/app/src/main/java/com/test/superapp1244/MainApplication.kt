@@ -1,4 +1,4 @@
-package com.testsuperapp
+package com.test.superapp1244
 
 import android.app.Application
 import com.facebook.react.PackageList
