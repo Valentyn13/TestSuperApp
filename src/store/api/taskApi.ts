@@ -10,8 +10,8 @@ export interface TaskQueryParams {
     sortBy?: 'deadline_asc' | 'deadline_desc';
     searchTitle?: string;
     limit?: number;
-    lastDocId?: string; // Serializable cursor - document ID
-    lastDocValue?: any; // Serializable cursor - the field value we're sorting by
+    lastDocId?: string;
+    lastDocValue?: any;
 }
 
 export interface PaginatedTasksResponse {
@@ -180,10 +180,9 @@ export const taskApi = createApi({
         getTasksPaginated: builder.query<PaginatedTasksResponse, TaskQueryParams | void>({
             queryFn: async (params) => {
                 try {
-                    const limit = params?.limit || 10; // Default page size
+                    const limit = params?.limit || 10;
                     let query = firestore().collection('tasks');
 
-                    // Apply filters
                     if (params && params.priority) {
                         query = query.where('priority', '==', params.priority) as any;
                     }
@@ -194,7 +193,6 @@ export const taskApi = createApi({
                         query = query.where('categoryId', '==', params.categoryId) as any;
                     }
 
-                    // Apply search by title (prefix search on lowercase field)
                     if (params && params.searchTitle) {
                         const searchLower = params.searchTitle.toLowerCase();
                         query = query
@@ -202,26 +200,29 @@ export const taskApi = createApi({
                             .startAt(searchLower)
                             .endAt(searchLower + '\uf8ff') as any;
                     } else if (params && params.sortBy) {
-                        // Apply sorting only if no search
                         const direction = params.sortBy === 'deadline_asc' ? 'asc' : 'desc';
                         query = query.orderBy('deadline', direction) as any;
                     } else if (!params?.priority && !params?.status && !params?.categoryId) {
-                        // Default ordering by createdAt ONLY if no filters are active
-                        // This avoids creating composite indexes for every filter+sort combination
                         query = query.orderBy('createdAt', 'desc') as any;
                     }
 
-                    // Pagination cursor
                     if (params && params.lastDocId) {
-                        if (params.lastDocValue !== undefined && params.lastDocValue !== null) {
-                            query = query.startAfter(params.lastDocValue, params.lastDocId) as any;
-                        } else {
-                            // If no value (e.g. filtered view without sort), just use ID
-                            query = query.startAfter(params.lastDocId) as any;
+                        if (params.searchTitle) {
+                            if (params.lastDocValue !== undefined && params.lastDocValue !== null) {
+                                query = query.startAfter(params.lastDocValue) as any;
+                            }
+                        } else if (params.sortBy) {
+                            if (params.lastDocValue !== undefined && params.lastDocValue !== null) {
+                                query = query.startAfter(params.lastDocValue) as any;
+                            }
+                        } else if (!params?.priority && !params?.status && !params?.categoryId) {
+                            if (params.lastDocValue !== undefined && params.lastDocValue !== null) {
+                                query = query.startAfter(params.lastDocValue) as any;
+                            }
                         }
                     }
 
-                    query = query.limit(limit + 1) as any; // One extra to check if there's more
+                    query = query.limit(limit + 1) as any;
 
                     const netInfo = await NetInfo.fetch();
                     const isConnected = netInfo.isConnected && netInfo.isInternetReachable;
@@ -233,7 +234,6 @@ export const taskApi = createApi({
                         .slice(0, limit)
                         .map((doc) => doc.data() as Task);
 
-                    // Get cursor data for last document
                     let lastDocId: string | null = null;
                     let lastDocValue: any = null;
 
@@ -246,7 +246,6 @@ export const taskApi = createApi({
                         } else if (params && params.sortBy) {
                             lastDocValue = lastDocSnapshot.get('deadline');
                         } else if (!params?.priority && !params?.status && !params?.categoryId) {
-                            // Only get createdAt if we are using the default sort
                             lastDocValue = lastDocSnapshot.get('createdAt');
                         }
                     }
@@ -261,7 +260,6 @@ export const taskApi = createApi({
                     };
                 } catch (error: any) {
                     console.error('TaskApi Error:', error);
-                    // Firebase index errors have a message property with the URL
                     if (error?.message?.includes('index')) {
                         console.error(error.message);
                     }

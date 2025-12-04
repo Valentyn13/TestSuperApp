@@ -5,8 +5,7 @@ import {
     FlatList,
     TouchableOpacity,
     ActivityIndicator,
-    Pressable,
-    Image,
+
 } from 'react-native';
 import { useGetTasksPaginatedQuery, useUpdateTaskMutation } from '../../store/api/taskApi';
 import { useGetCategoriesQuery } from '../../store/api/categoryApi';
@@ -30,7 +29,6 @@ export const TaskActionScreen = () => {
     const [updateTask] = useUpdateTaskMutation();
     const { data: categories } = useGetCategoriesQuery();
 
-    // Applied filters - used for the actual query
     const [appliedFilters, setAppliedFilters] = useState<FilterState>({
         priority: null,
         status: null,
@@ -39,12 +37,8 @@ export const TaskActionScreen = () => {
     const [appliedSortBy, setAppliedSortBy] = useState<SortOption>(null);
     const [appliedSearchTitle, setAppliedSearchTitle] = useState('');
 
-
-
-
     const { openBottomSheet, closeBottomSheet } = useBottomSheet();
 
-    // Pagination state - using serializable cursor data
     const [allTasks, setAllTasks] = useState<Task[]>([]);
     const [currentCursor, setCurrentCursor] = useState<{ id: string; value: any } | null>(null);
     const [nextCursor, setNextCursor] = useState<{ id: string; value: any } | null>(null);
@@ -52,32 +46,19 @@ export const TaskActionScreen = () => {
     const [isLoadingMore, setIsLoadingMore] = useState(false);
     const lastFetchedCursorRef = useRef<{ id: string; value: any } | null>(null);
 
-    // Query with applied filters and pagination
     const { data: paginatedData, isLoading, isFetching, error, refetch } = useGetTasksPaginatedQuery({
         priority: appliedFilters.priority || undefined,
         status: appliedFilters.status || undefined,
         categoryId: appliedFilters.categoryId || undefined,
         sortBy: appliedSortBy || undefined,
         searchTitle: appliedSearchTitle || undefined,
-        limit: 20,
+        limit: 10,
         lastDocId: currentCursor?.id,
         lastDocValue: currentCursor?.value,
     }, {
-        refetchOnMountOrArgChange: true, // Always refetch on mount or when args change
+        refetchOnMountOrArgChange: true,
     });
 
-    // Debug query state
-    useEffect(() => {
-        console.log('TaskActionScreen - Query state:', {
-            isLoading,
-            isFetching,
-            hasData: !!paginatedData,
-            hasError: !!error,
-            taskCount: paginatedData?.tasks?.length,
-        });
-    }, [isLoading, isFetching, paginatedData, error]);
-
-    // Update tasks when data changes OR when fetching completes
     useEffect(() => {
         console.log('TaskActionScreen - paginatedData/fetch changed:', {
             hasData: !!paginatedData,
@@ -99,24 +80,17 @@ export const TaskActionScreen = () => {
             return;
         }
 
-        // Determine if we should replace or append based on the last cursor we fetched with
-        const shouldAppend = lastFetchedCursorRef.current !== null &&
-            lastFetchedCursorRef.current?.id !== currentCursor?.id;
+
+        const shouldAppend = currentCursor !== null;
 
         if (shouldAppend) {
-            // Pagination - append new tasks
-            console.log('Appending tasks:', paginatedData.tasks.length);
             setAllTasks(prev => [...prev, ...paginatedData.tasks]);
         } else {
-            // First page or refresh - replace all tasks
-            console.log('Setting/Refreshing all tasks:', paginatedData.tasks.length);
             setAllTasks(paginatedData.tasks);
         }
 
-        // Update the ref to track what cursor was used for this fetch
         lastFetchedCursorRef.current = currentCursor;
 
-        // Store cursor for next page
         if (paginatedData.lastDocId && paginatedData.lastDocValue !== undefined) {
             setNextCursor({ id: paginatedData.lastDocId, value: paginatedData.lastDocValue });
         } else {
@@ -125,7 +99,7 @@ export const TaskActionScreen = () => {
 
         setHasMore(paginatedData.hasMore);
         setIsLoadingMore(false);
-    }, [paginatedData, isFetching, isLoading]); // Depend on fetching state too
+    }, [paginatedData, isFetching, isLoading, currentCursor]);
 
     // Reset pagination when filters change
     useEffect(() => {
@@ -137,15 +111,6 @@ export const TaskActionScreen = () => {
         setIsLoadingMore(false);
     }, [appliedFilters, appliedSortBy, appliedSearchTitle]);
 
-    // Debug allTasks state
-    useEffect(() => {
-        console.log('TaskActionScreen - allTasks state changed:', {
-            count: allTasks.length,
-            tasks: allTasks
-        });
-    }, [allTasks]);
-
-    // Refetch when screen comes into focus
     useFocusEffect(
         useCallback(() => {
             refetch();
@@ -184,7 +149,6 @@ export const TaskActionScreen = () => {
     };
 
     const handleApplyFilters = useCallback((newFilters: FilterState, newSortBy: SortOption, newSearchTitle: string) => {
-        // Apply temp filters to actual query
         setAppliedFilters(newFilters);
         setAppliedSortBy(newSortBy);
         setAppliedSearchTitle(newSearchTitle);
