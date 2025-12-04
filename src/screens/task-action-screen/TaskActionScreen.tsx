@@ -2,21 +2,20 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     View,
     Text,
-    TextInput,
     FlatList,
     TouchableOpacity,
     ActivityIndicator,
     Pressable,
-    Modal,
-    ScrollView,
     Image,
 } from 'react-native';
 import { useGetTasksPaginatedQuery, useUpdateTaskMutation } from '../../store/api/taskApi';
 import { useGetCategoriesQuery } from '../../store/api/categoryApi';
-import { Task, TaskStatus, TaskPriority, TaskPriorityType, TaskStatusType } from '../../types';
+import { Task, TaskStatus, TaskPriorityType, TaskStatusType } from '../../types';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { styles } from './TaskActionScreen.styles';
-import { useNetwork } from '../../contexts/network-context';
+import { useBottomSheet } from '../../contexts/bottom-sheet-context';
+import { TaskFilters } from '../../components/task-filters/TaskFilters';
+import { TaskItem } from '../../components/task-item/TaskItem';
 
 type SortOption = 'deadline_asc' | 'deadline_desc' | null;
 
@@ -30,7 +29,6 @@ export const TaskActionScreen = () => {
     const navigation = useNavigation<any>();
     const [updateTask] = useUpdateTaskMutation();
     const { data: categories } = useGetCategoriesQuery();
-    const { isConnected } = useNetwork();
 
     // Applied filters - used for the actual query
     const [appliedFilters, setAppliedFilters] = useState<FilterState>({
@@ -41,17 +39,10 @@ export const TaskActionScreen = () => {
     const [appliedSortBy, setAppliedSortBy] = useState<SortOption>(null);
     const [appliedSearchTitle, setAppliedSearchTitle] = useState('');
 
-    // Temporary filters - only in the modal
-    const [tempFilters, setTempFilters] = useState<FilterState>({
-        priority: null,
-        status: null,
-        categoryId: null,
-    });
-    const [tempSortBy, setTempSortBy] = useState<SortOption>(null);
-    const [tempSearchTitle, setTempSearchTitle] = useState('');
 
-    const [isFilterModalVisible, setFilterModalVisible] = useState(false);
-    const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
+
+
+    const { openBottomSheet, closeBottomSheet } = useBottomSheet();
 
     // Pagination state - using serializable cursor data
     const [allTasks, setAllTasks] = useState<Task[]>([]);
@@ -60,10 +51,6 @@ export const TaskActionScreen = () => {
     const [hasMore, setHasMore] = useState(true);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
     const lastFetchedCursorRef = useRef<{ id: string; value: any } | null>(null);
-
-    useEffect(() => {
-        console.log('TaskActionScreen - Network connection status:', isConnected);
-    }, [isConnected]);
 
     // Query with applied filters and pagination
     const { data: paginatedData, isLoading, isFetching, error, refetch } = useGetTasksPaginatedQuery({
@@ -190,27 +177,21 @@ export const TaskActionScreen = () => {
         });
     };
 
+
+
     const handleOpenFilterModal = () => {
-        // Sync temp filters with applied filters when opening modal
-        setTempFilters(appliedFilters);
-        setTempSortBy(appliedSortBy);
-        setTempSearchTitle(appliedSearchTitle);
-        setFilterModalVisible(true);
+        handleOpenBottomSheet();
     };
 
-    const handleApplyFilters = () => {
+    const handleApplyFilters = useCallback((newFilters: FilterState, newSortBy: SortOption, newSearchTitle: string) => {
         // Apply temp filters to actual query
-        setAppliedFilters(tempFilters);
-        setAppliedSortBy(tempSortBy);
-        setAppliedSearchTitle(tempSearchTitle);
-        setFilterModalVisible(false);
-    };
+        setAppliedFilters(newFilters);
+        setAppliedSortBy(newSortBy);
+        setAppliedSearchTitle(newSearchTitle);
+        closeBottomSheet();
+    }, [closeBottomSheet]);
 
-    const handleClearFilters = () => {
-        setTempFilters({ priority: null, status: null, categoryId: null });
-        setTempSortBy(null);
-        setTempSearchTitle('');
-    };
+
 
     const handleLoadMore = useCallback(() => {
         if (!isFetching && !isLoadingMore && hasMore && nextCursor) {
@@ -230,66 +211,27 @@ export const TaskActionScreen = () => {
         return '#000000';
     };
 
+    const handleOpenBottomSheet = useCallback(() => {
+        openBottomSheet(<TaskFilters
+            initialFilters={appliedFilters}
+            initialSortBy={appliedSortBy}
+            initialSearchTitle={appliedSearchTitle}
+            categories={categories}
+            onApply={handleApplyFilters}
+            onClose={closeBottomSheet}
+        />, '80%');
+    }, [openBottomSheet, appliedFilters, appliedSortBy, appliedSearchTitle, categories, handleApplyFilters, closeBottomSheet]);
+
     const renderItem = ({ item }: { item: Task }) => {
         const statusColor = getStatusColor(item);
-        const isCompleted = item.status === TaskStatus.COMPLETED;
-        const isExpanded = expandedTaskId === item.id;
-        const hasImage = !!item.imageUrl;
 
         return (
-            <View style={styles.cardWrapper}>
-                <TouchableOpacity
-                    style={[styles.card, isExpanded && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, marginBottom: 12 }]}
-                    onPress={() => handleEditTask(item)}
-                    activeOpacity={0.9}
-                >
-                    <View style={[styles.statusStrip, { backgroundColor: statusColor }]} />
-                    <View style={styles.cardContent}>
-                        <View style={styles.textContainer}>
-                            <Text style={[styles.title, isCompleted && styles.completedText]}>
-                                {item.title}
-                            </Text>
-                            {item.description ? (
-                                <Text style={styles.description} numberOfLines={2}>
-                                    {item.description}
-                                </Text>
-                            ) : null}
-                            <Text style={styles.deadline}>
-                                {new Date(item.deadline).toLocaleDateString()}
-                            </Text>
-                        </View>
-                        <View style={styles.actionsContainer}>
-                            <Pressable
-                                style={[styles.checkbox, isCompleted && styles.checkboxChecked]}
-                                onPress={(e) => {
-                                    e.stopPropagation();
-                                    handleToggleStatus(item);
-                                }}
-                                hitSlop={10}
-                            >
-                                {isCompleted && <View style={styles.checkboxInner} />}
-                            </Pressable>
-                            {hasImage && (
-                                <Pressable
-                                    onPress={(e) => {
-                                        e.stopPropagation();
-                                        setExpandedTaskId(isExpanded ? null : item.id);
-                                    }}
-                                    hitSlop={10}
-                                    style={styles.chevron}
-                                >
-                                    <Text style={styles.chevronText}>
-                                        {isExpanded ? '▲' : '▼'}
-                                    </Text>
-                                </Pressable>
-                            )}
-                        </View>
-                    </View>
-                </TouchableOpacity>
-                {isExpanded && hasImage && (
-                    <Image source={{ uri: item.imageUrl }} style={styles.expandedImage} />
-                )}
-            </View>
+            <TaskItem
+                item={item}
+                onPress={handleEditTask}
+                onToggleStatus={handleToggleStatus}
+                statusColor={statusColor}
+            />
         );
     };
 
@@ -343,202 +285,6 @@ export const TaskActionScreen = () => {
             <TouchableOpacity style={styles.fab} onPress={handleCreateTask}>
                 <Text style={styles.fabText}>+</Text>
             </TouchableOpacity>
-
-            <Modal
-                visible={isFilterModalVisible}
-                animationType="slide"
-                transparent={true}
-                onRequestClose={() => setFilterModalVisible(false)}
-            >
-                <View style={styles.modalContainer}>
-                    <View style={styles.modalContent}>
-                        <ScrollView>
-                            <Text style={styles.modalTitle}>Filter & Sort</Text>
-
-                            <Text style={styles.sectionTitle}>Search by Title</Text>
-                            <TextInput
-                                style={styles.searchInput}
-                                placeholder="Enter task title..."
-                                value={tempSearchTitle}
-                                onChangeText={(text) => {
-                                    setTempSearchTitle(text);
-                                    if (text.length > 0) {
-                                        setTempFilters({ priority: null, status: null, categoryId: null });
-                                        setTempSortBy(null);
-                                    }
-                                }}
-                            />
-
-                            <Text style={styles.sectionTitle}>Priority</Text>
-                            <View style={styles.filterRow}>
-                                {Object.values(TaskPriority).map((p) => (
-                                    <TouchableOpacity
-                                        key={p}
-                                        style={[
-                                            styles.filterChip,
-                                            tempFilters.priority === p && styles.filterChipSelected,
-                                        ]}
-                                        onPress={() =>
-                                            setTempFilters((prev) => {
-                                                const newVal = prev.priority === p ? null : p;
-                                                if (newVal) {
-                                                    setTempSearchTitle('');
-                                                    setTempSortBy(null);
-                                                    return { priority: newVal, status: null, categoryId: null };
-                                                }
-                                                return { ...prev, priority: null };
-                                            })
-                                        }
-                                    >
-                                        <Text
-                                            style={[
-                                                styles.filterChipText,
-                                                tempFilters.priority === p && styles.filterChipTextSelected,
-                                            ]}
-                                        >
-                                            {p.toUpperCase()}
-                                        </Text>
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
-
-                            <Text style={styles.sectionTitle}>Status</Text>
-                            <View style={styles.filterRow}>
-                                {Object.values(TaskStatus).map((s) => (
-                                    <TouchableOpacity
-                                        key={s}
-                                        style={[
-                                            styles.filterChip,
-                                            tempFilters.status === s && styles.filterChipSelected,
-                                        ]}
-                                        onPress={() =>
-                                            setTempFilters((prev) => {
-                                                const newVal = prev.status === s ? null : s;
-                                                if (newVal) {
-                                                    setTempSearchTitle('');
-                                                    setTempSortBy(null);
-                                                    return { priority: null, status: newVal, categoryId: null };
-                                                }
-                                                return { ...prev, status: null };
-                                            })
-                                        }
-                                    >
-                                        <Text
-                                            style={[
-                                                styles.filterChipText,
-                                                tempFilters.status === s && styles.filterChipTextSelected,
-                                            ]}
-                                        >
-                                            {s.toUpperCase()}
-                                        </Text>
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
-
-                            <Text style={styles.sectionTitle}>Category</Text>
-                            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                                <View style={styles.filterRow}>
-                                    {categories?.map((c) => (
-                                        <TouchableOpacity
-                                            key={c.id}
-                                            style={[
-                                                styles.filterChip,
-                                                tempFilters.categoryId === c.id && styles.filterChipSelected,
-                                            ]}
-                                            onPress={() =>
-                                                setTempFilters((prev) => {
-                                                    const newVal = prev.categoryId === c.id ? null : c.id;
-                                                    if (newVal) {
-                                                        setTempSearchTitle('');
-                                                        setTempSortBy(null);
-                                                        return { priority: null, status: null, categoryId: newVal };
-                                                    }
-                                                    return { ...prev, categoryId: null };
-                                                })
-                                            }
-                                        >
-                                            <Text
-                                                style={[
-                                                    styles.filterChipText,
-                                                    tempFilters.categoryId === c.id &&
-                                                    styles.filterChipTextSelected,
-                                                ]}
-                                            >
-                                                {c.name}
-                                            </Text>
-                                        </TouchableOpacity>
-                                    ))}
-                                </View>
-                            </ScrollView>
-
-                            <Text style={styles.sectionTitle}>Sort By Deadline</Text>
-                            <View style={styles.filterRow}>
-                                <TouchableOpacity
-                                    style={[
-                                        styles.filterChip,
-                                        tempSortBy === 'deadline_asc' && styles.filterChipSelected,
-                                    ]}
-                                    onPress={() => {
-                                        const newVal = tempSortBy === 'deadline_asc' ? null : 'deadline_asc';
-                                        setTempSortBy(newVal);
-                                        if (newVal) {
-                                            setTempFilters({ priority: null, status: null, categoryId: null });
-                                            setTempSearchTitle('');
-                                        }
-                                    }}
-                                >
-                                    <Text
-                                        style={[
-                                            styles.filterChipText,
-                                            tempSortBy === 'deadline_asc' && styles.filterChipTextSelected,
-                                        ]}
-                                    >
-                                        Ascending
-                                    </Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={[
-                                        styles.filterChip,
-                                        tempSortBy === 'deadline_desc' && styles.filterChipSelected,
-                                    ]}
-                                    onPress={() => {
-                                        const newVal = tempSortBy === 'deadline_desc' ? null : 'deadline_desc';
-                                        setTempSortBy(newVal);
-                                        if (newVal) {
-                                            setTempFilters({ priority: null, status: null, categoryId: null });
-                                            setTempSearchTitle('');
-                                        }
-                                    }}
-                                >
-                                    <Text
-                                        style={[
-                                            styles.filterChipText,
-                                            tempSortBy === 'deadline_desc' && styles.filterChipTextSelected,
-                                        ]}
-                                    >
-                                        Descending
-                                    </Text>
-                                </TouchableOpacity>
-                            </View>
-                        </ScrollView>
-
-                        <View style={styles.modalActions}>
-                            <TouchableOpacity
-                                style={styles.clearButton}
-                                onPress={handleClearFilters}
-                            >
-                                <Text style={styles.clearButtonText}>Clear All</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={styles.applyButton}
-                                onPress={handleApplyFilters}
-                            >
-                                <Text style={styles.applyButtonText}>Apply</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                </View>
-            </Modal>
         </View>
     );
 };

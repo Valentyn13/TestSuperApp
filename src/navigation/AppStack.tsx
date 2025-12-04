@@ -6,9 +6,13 @@ import { TaskActionScreen } from '../screens/task-action-screen/TaskActionScreen
 import { TaskCreateScreen } from '../screens/create-task-screen/TaskCreateScreen';
 import { TaskEditScreen } from '../screens/task-edit-screen/TaskEditScreen';
 import { CategoryScreen } from '../screens/category-screen/CategoryScreen';
+import { IconHomeTab, IconTasksTab } from '../assets/icons';
 
 const Tab = createBottomTabNavigator();
 const TasksStack = createNativeStackNavigator();
+
+const ACTIVE_COLOR = '#000000';
+const INACTIVE_COLOR = '#999999';
 
 const TasksStackNavigator = () => {
     return (
@@ -23,9 +27,39 @@ const TasksStackNavigator = () => {
 
 export const AppStack = () => {
     return (
-        <Tab.Navigator screenOptions={{ headerShown: false }}>
-            <Tab.Screen name="Home" component={HomeScreen} />
-            <Tab.Screen name="Tasks" component={TasksStackNavigator} />
+        <Tab.Navigator
+            screenOptions={{
+                headerShown: false,
+                tabBarActiveTintColor: ACTIVE_COLOR,
+                tabBarInactiveTintColor: INACTIVE_COLOR,
+            }}
+        >
+            <Tab.Screen
+                name="Home"
+                component={HomeScreen}
+                options={{
+                    tabBarIcon: ({ focused }) => (
+                        <IconHomeTab
+                            fill={focused ? ACTIVE_COLOR : INACTIVE_COLOR}
+                            width={24}
+                            height={24}
+                        />
+                    ),
+                }}
+            />
+            <Tab.Screen
+                name="Tasks"
+                component={TasksStackNavigator}
+                options={{
+                    tabBarIcon: ({ focused }) => (
+                        <IconTasksTab
+                            stroke={focused ? ACTIVE_COLOR : INACTIVE_COLOR}
+                            width={24}
+                            height={24}
+                        />
+                    ),
+                }}
+            />
         </Tab.Navigator>
     );
 };

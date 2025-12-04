@@ -13,6 +13,7 @@ import { store, persistor } from './src/store';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { useEffect } from 'react';
 import { NetworkProvider } from './src/contexts/network-context';
+import BottomSheetProvider from './src/contexts/bottom-sheet-context';
 
 function App() {
 
@@ -25,11 +26,13 @@ function App() {
   return (
     <Provider store={store}>
       <PersistGate loading={null} persistor={persistor}>
-        <NetworkProvider>
-          <GestureHandlerRootView>
-            <RootNavigator />
-          </GestureHandlerRootView>
-        </NetworkProvider>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <NetworkProvider>
+            <BottomSheetProvider>
+              <RootNavigator />
+            </BottomSheetProvider>
+          </NetworkProvider>
+        </GestureHandlerRootView>
       </PersistGate>
     </Provider>
   );

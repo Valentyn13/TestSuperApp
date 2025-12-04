@@ -23,14 +23,24 @@ import { TaskPriority, Task } from '../../types';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { pickImage, uploadImageToStorage, deleteImageFromStorage } from '../../helpers';
 import { styles } from './TaskEditScreen.styles';
+import { Calendar } from 'react-native-calendars';
 
 const taskSchema = z.object({
     title: z.string().min(1, 'Title is required'),
     description: z.string().optional(),
     priority: z.enum([TaskPriority.LOW, TaskPriority.MEDIUM, TaskPriority.HIGH]),
-    deadline: z.string().refine((val) => !isNaN(Date.parse(val)), {
-        message: 'Invalid date format (YYYY-MM-DD)',
-    }),
+    deadline: z.string()
+        .refine((val) => !isNaN(Date.parse(val)), {
+            message: 'Invalid date format',
+        })
+        .refine((val) => {
+            const selectedDate = new Date(val);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            return selectedDate >= today;
+        }, {
+            message: 'Deadline cannot be in the past',
+        }),
     categoryId: z.string().optional(),
 });
 
@@ -143,7 +153,7 @@ export const TaskEditScreen = () => {
     };
 
     return (
-        <ScrollView contentContainerStyle={styles.container}>
+        <ScrollView bounces={false} showsVerticalScrollIndicator={false} contentContainerStyle={styles.container}>
             <Text style={styles.label}>Title</Text>
             <Controller
                 control={control}
@@ -218,7 +228,7 @@ export const TaskEditScreen = () => {
             <Modal
                 visible={isCategoryModalVisible}
                 transparent={true}
-                animationType="slide"
+                animationType="fade"
             >
                 <View style={styles.modalContainer}>
                     <View style={styles.modalContent}>
@@ -256,23 +266,35 @@ export const TaskEditScreen = () => {
                 </View>
             </Modal>
 
-            <Text style={styles.label}>Deadline (YYYY-MM-DD)</Text>
+
+            <Text style={styles.label}>Deadline</Text>
             <Controller
                 control={control}
                 name="deadline"
-                render={({ field: { onChange, onBlur, value } }) => (
-                    <TextInput
-                        style={styles.input}
-                        onBlur={onBlur}
-                        onChangeText={onChange}
-                        value={value}
-                        placeholder="YYYY-MM-DD"
+                render={({ field: { onChange, value } }) => (
+                    <Calendar
+                        onDayPress={(day) => {
+                            onChange(day.dateString);
+                        }}
+                        markedDates={
+                            value ? {
+                                [value]: { selected: true, selectedColor: '#000' },
+                            } : {}
+                        }
+                        minDate={new Date().toISOString().split('T')[0]}
+                        theme={{
+                            selectedDayBackgroundColor: '#000',
+                            todayTextColor: '#000',
+                            arrowColor: '#000',
+                        }}
                     />
                 )}
             />
             {errors.deadline && (
                 <Text style={styles.error}>{errors.deadline.message}</Text>
             )}
+
+
 
             <Text style={styles.label}>Image</Text>
             {task.imageUrl && !selectedImageUri && (

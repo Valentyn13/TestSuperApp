@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
     Text,
@@ -15,17 +15,28 @@ import { z } from 'zod';
 import { useAddTaskMutation } from '../../store/api/taskApi';
 import { TaskPriority, TaskStatus } from '../../types';
 import { v4 as uuidv4 } from 'uuid';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { pickImage, uploadImageToStorage } from '../../helpers';
 import { styles } from './CreateTaskScreen.styles';
+import { Calendar } from 'react-native-calendars';
+import { taskDraftService } from '../../services/taskDraftService';
 
 const taskSchema = z.object({
     title: z.string().min(1, 'Title is required'),
     description: z.string().optional(),
     priority: z.enum([TaskPriority.LOW, TaskPriority.MEDIUM, TaskPriority.HIGH]),
-    deadline: z.string().refine((val) => !isNaN(Date.parse(val)), {
-        message: 'Invalid date format (YYYY-MM-DD)',
-    }),
+    deadline: z.string()
+        .refine((val) => !isNaN(Date.parse(val)), {
+            message: 'Invalid date format',
+        })
+        .refine((val) => {
+            const selectedDate = new Date(val);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            return selectedDate >= today;
+        }, {
+            message: 'Deadline cannot be in the past',
+        }),
 });
 
 type TaskFormData = z.infer<typeof taskSchema>;
@@ -35,11 +46,16 @@ export const TaskCreateScreen = () => {
     const [addTask, { isLoading }] = useAddTaskMutation();
     const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
     const [isUploading, setIsUploading] = useState(false);
+    const [isDraftLoaded, setIsDraftLoaded] = useState(false);
+    const isSubmittingRef = useRef(false);
 
     const {
         control,
         handleSubmit,
         formState: { errors },
+        watch,
+        setValue,
+        reset,
     } = useForm<TaskFormData>({
         resolver: zodResolver(taskSchema),
         defaultValues: {
@@ -50,6 +66,124 @@ export const TaskCreateScreen = () => {
         },
     });
 
+    // Watch all form values for saving on unmount
+    const formValues = watch();
+
+    // Load draft on component mount
+    useEffect(() => {
+        const loadDraft = async () => {
+            try {
+                const draft = await taskDraftService.loadDraft();
+                if (draft) {
+                    // Confirm with user before loading draft
+                    Alert.alert(
+                        'Draft Found',
+                        'You have an unsaved draft. Would you like to continue editing it?',
+                        [
+                            {
+                                text: 'Discard',
+                                style: 'destructive',
+                                onPress: async () => {
+                                    await taskDraftService.clearDraft();
+                                    setIsDraftLoaded(true);
+                                },
+                            },
+                            {
+                                text: 'Continue',
+                                onPress: () => {
+                                    setValue('title', draft.title);
+                                    setValue('description', draft.description || '');
+                                    setValue('priority', draft.priority as any);
+                                    setValue('deadline', draft.deadline);
+                                    if (draft.imageUri) {
+                                        setSelectedImageUri(draft.imageUri);
+                                    }
+                                    setIsDraftLoaded(true);
+                                },
+                            },
+                        ]
+                    );
+                } else {
+                    setIsDraftLoaded(true);
+                }
+            } catch (error) {
+                console.error('Error loading draft:', error);
+                setIsDraftLoaded(true);
+            }
+        };
+
+        loadDraft();
+    }, [setValue]);
+
+    // Save draft when screen loses focus or app goes to background
+    useEffect(() => {
+        const saveDraftOnBlur = async () => {
+            // Don't save if draft hasn't been loaded yet or if we're submitting
+            if (!isDraftLoaded || isSubmittingRef.current) {
+                return;
+            }
+
+            // Only save if there's actual content
+            const hasContent = formValues.title.trim().length > 0 ||
+                (formValues.description && formValues.description.trim().length > 0) ||
+                selectedImageUri !== null;
+
+            if (hasContent) {
+                try {
+                    await taskDraftService.saveDraft({
+                        title: formValues.title,
+                        description: formValues.description,
+                        priority: formValues.priority,
+                        deadline: formValues.deadline,
+                        imageUri: selectedImageUri || undefined,
+                        savedAt: new Date().toISOString(),
+                    });
+                    console.log('Draft saved on screen blur');
+                } catch (error) {
+                    console.error('Error saving draft on blur:', error);
+                }
+            }
+        };
+
+        // Save draft when component unmounts (user navigates away or app closes)
+        return () => {
+            saveDraftOnBlur();
+        };
+    }, [formValues, selectedImageUri, isDraftLoaded]);
+
+    // Listen for navigation events to save draft before leaving
+    useEffect(() => {
+        const unsubscribe = navigation.addListener('beforeRemove', async (e) => {
+            // Don't save if submitting
+            if (isSubmittingRef.current) {
+                return;
+            }
+
+            // Only save if there's actual content
+            const hasContent = formValues.title.trim().length > 0 ||
+                (formValues.description && formValues.description.trim().length > 0) ||
+                selectedImageUri !== null;
+
+            if (hasContent && isDraftLoaded) {
+                try {
+                    await taskDraftService.saveDraft({
+                        title: formValues.title,
+                        description: formValues.description,
+                        priority: formValues.priority,
+                        deadline: formValues.deadline,
+                        imageUri: selectedImageUri || undefined,
+                        savedAt: new Date().toISOString(),
+                    });
+                    console.log('Draft saved before navigation');
+                } catch (error) {
+                    console.error('Error saving draft before navigation:', error);
+                }
+            }
+        });
+
+        return unsubscribe;
+    }, [navigation, formValues, selectedImageUri, isDraftLoaded]);
+
     const handlePickImage = async () => {
         const uri = await pickImage();
         if (uri) {
@@ -59,6 +193,7 @@ export const TaskCreateScreen = () => {
 
     const onSubmit = async (data: TaskFormData) => {
         try {
+            isSubmittingRef.current = true;
             setIsUploading(true);
             const taskId = uuidv4();
 
@@ -84,17 +219,22 @@ export const TaskCreateScreen = () => {
             };
 
             await addTask(newTask).unwrap();
+
+            // Clear draft after successful creation
+            await taskDraftService.clearDraft();
+
             navigation.goBack();
         } catch (error) {
             Alert.alert('Error', 'Failed to create task');
             console.error(error);
+            isSubmittingRef.current = false;
         } finally {
             setIsUploading(false);
         }
     };
 
     return (
-        <ScrollView contentContainerStyle={styles.container}>
+        <ScrollView bounces={false} showsVerticalScrollIndicator={false} contentContainerStyle={styles.container}>
             <Text style={styles.label}>Title</Text>
             <Controller
                 control={control}
@@ -156,23 +296,35 @@ export const TaskCreateScreen = () => {
                 )}
             />
 
-            <Text style={styles.label}>Deadline (YYYY-MM-DD)</Text>
+
+            <Text style={styles.label}>Deadline</Text>
             <Controller
                 control={control}
                 name="deadline"
-                render={({ field: { onChange, onBlur, value } }) => (
-                    <TextInput
-                        style={styles.input}
-                        onBlur={onBlur}
-                        onChangeText={onChange}
-                        value={value}
-                        placeholder="YYYY-MM-DD"
+                render={({ field: { onChange, value } }) => (
+                    <Calendar
+                        onDayPress={(day) => {
+                            onChange(day.dateString);
+                        }}
+                        markedDates={
+                            value ? {
+                                [value]: { selected: true, selectedColor: '#000' },
+                            } : {}
+                        }
+                        minDate={new Date().toISOString().split('T')[0]}
+                        theme={{
+                            selectedDayBackgroundColor: '#000',
+                            todayTextColor: '#000',
+                            arrowColor: '#000',
+                        }}
                     />
                 )}
             />
             {errors.deadline && (
                 <Text style={styles.error}>{errors.deadline.message}</Text>
             )}
+
+
 
             <Text style={styles.label}>Image (Optional)</Text>
             <TouchableOpacity style={styles.imageButton} onPress={handlePickImage}>

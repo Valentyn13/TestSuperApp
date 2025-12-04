@@ -9,19 +9,15 @@ export const LoginScreen = () => {
 
     async function onGoogleButtonPress() {
         try {
-            // Check if your device supports Google Play
             await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
-            // Get the users ID token
             const response = await GoogleSignin.signIn();
             const idToken = response.data?.idToken;
             if (!idToken) {
                 throw new Error('Google Sign-In failed - no id token returned');
             }
 
-            // Create a Google credential with the token
             const googleCredential = auth.GoogleAuthProvider.credential(idToken);
 
-            // Sign-in the user with the credential
             await auth().signInWithCredential(googleCredential);
         } catch (error: any) {
             if (error.code === statusCodes.SIGN_IN_CANCELLED) {
@@ -39,22 +35,17 @@ export const LoginScreen = () => {
 
     async function onAppleButtonPress() {
         try {
-            // Start the sign-in request
             const appleAuthRequestResponse = await appleAuth.performRequest({
                 requestedOperation: appleAuth.Operation.LOGIN,
                 requestedScopes: [appleAuth.Scope.EMAIL, appleAuth.Scope.FULL_NAME],
             });
-
-            // Ensure Apple returned a user identityToken
             if (!appleAuthRequestResponse.identityToken) {
                 throw new Error('Apple Sign-In failed - no identify token returned');
             }
 
-            // Create a Firebase credential from the response
             const { identityToken, nonce } = appleAuthRequestResponse;
             const appleCredential = auth.AppleAuthProvider.credential(identityToken, nonce);
 
-            // Sign the user in with the credential
             await auth().signInWithCredential(appleCredential);
         } catch (error: any) {
             if (error.code === appleAuth.Error.CANCELED) {
