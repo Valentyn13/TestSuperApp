@@ -1,11 +1,11 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { HomeScreen } from '../screens/HomeScreen';
+import { HomeScreen } from '../screens/home-screen/HomeScreen';
 import { TaskActionScreen } from '../screens/task-action-screen/TaskActionScreen';
-import { TaskCreateScreen } from '../screens/TaskCreateScreen';
-import { TaskEditScreen } from '../screens/TaskEditScreen';
-import { CategoryScreen } from '../screens/CategoryScreen';
+import { TaskCreateScreen } from '../screens/create-task-screen/TaskCreateScreen';
+import { TaskEditScreen } from '../screens/task-edit-screen/TaskEditScreen';
+import { CategoryScreen } from '../screens/category-screen/CategoryScreen';
 
 const Tab = createBottomTabNavigator();
 const TasksStack = createNativeStackNavigator();

@@ -11,7 +11,6 @@ import {
 } from 'redux-persist';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useDispatch, useSelector } from 'react-redux';
-import languageReducer from './slices/language-slice';
 
 import { taskApi } from './api/taskApi';
 import { categoryApi } from './api/categoryApi';
@@ -19,11 +18,10 @@ import { categoryApi } from './api/categoryApi';
 const persistConfig = {
     key: 'root',
     storage: AsyncStorage,
-    whitelist: ['language', 'taskApi', 'categoryApi'],
+    whitelist: ['taskApi', 'categoryApi'],
 };
 
 const rootReducer = combineReducers({
-    language: languageReducer,
     [taskApi.reducerPath]: taskApi.reducer,
     [categoryApi.reducerPath]: categoryApi.reducer,
 });

@@ -1,8 +1,9 @@
 import React, { useEffect } from 'react';
-import { View, StyleSheet, Alert, Platform } from 'react-native';
+import { View, Alert, Platform } from 'react-native';
 import { appleAuth, AppleButton } from '@invertase/react-native-apple-authentication';
 import auth from '@react-native-firebase/auth';
 import { GoogleSignin, GoogleSigninButton, statusCodes } from '@react-native-google-signin/google-signin';
+import { styles } from './LoginScreen.styles';
 
 export const LoginScreen = () => {
 
@@ -86,20 +87,3 @@ export const LoginScreen = () => {
     );
 };
 
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: '#000', // Dark background for contrast
-    },
-    appleButton: {
-        width: 200,
-        height: 45,
-        marginBottom: 20,
-    },
-    googleButton: {
-        width: 200,
-        height: 48,
-    },
-});

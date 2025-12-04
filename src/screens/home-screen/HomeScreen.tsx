@@ -1,7 +1,8 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, Button } from 'react-native';
+import { View, Text, Button } from 'react-native';
 import auth from '@react-native-firebase/auth';
-import { requestPhotoLibraryPermission } from '../helpers';
+import { requestPhotoLibraryPermission } from '../../helpers';
+import { styles } from './HomeScreen.styles';
 
 export const HomeScreen = () => {
     const user = auth().currentUser;
@@ -24,23 +25,3 @@ export const HomeScreen = () => {
     );
 };
 
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 20,
-    },
-    greeting: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        marginBottom: 20,
-    },
-    info: {
-        fontSize: 16,
-        marginBottom: 10,
-    },
-    buttonContainer: {
-        marginTop: 30,
-    },
-});
