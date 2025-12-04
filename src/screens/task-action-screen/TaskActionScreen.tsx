@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     View,
     Text,
@@ -11,10 +11,10 @@ import {
     ScrollView,
     Image,
 } from 'react-native';
-import { useGetTasksQuery, useUpdateTaskMutation } from '../../store/api/taskApi';
+import { useGetTasksPaginatedQuery, useUpdateTaskMutation } from '../../store/api/taskApi';
 import { useGetCategoriesQuery } from '../../store/api/categoryApi';
 import { Task, TaskStatus, TaskPriority, TaskPriorityType, TaskStatusType } from '../../types';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { styles } from './TaskActionScreen.styles';
 import { useNetwork } from '../../contexts/network-context';
 
@@ -53,14 +53,117 @@ export const TaskActionScreen = () => {
     const [isFilterModalVisible, setFilterModalVisible] = useState(false);
     const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
 
-    // Query with applied filters
-    const { data: tasks, isLoading, error } = useGetTasksQuery({
+    // Pagination state - using serializable cursor data
+    const [allTasks, setAllTasks] = useState<Task[]>([]);
+    const [currentCursor, setCurrentCursor] = useState<{ id: string; value: any } | null>(null);
+    const [nextCursor, setNextCursor] = useState<{ id: string; value: any } | null>(null);
+    const [hasMore, setHasMore] = useState(true);
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
+    const lastFetchedCursorRef = useRef<{ id: string; value: any } | null>(null);
+
+    useEffect(() => {
+        console.log('TaskActionScreen - Network connection status:', isConnected);
+    }, [isConnected]);
+
+    // Query with applied filters and pagination
+    const { data: paginatedData, isLoading, isFetching, error, refetch } = useGetTasksPaginatedQuery({
         priority: appliedFilters.priority || undefined,
         status: appliedFilters.status || undefined,
         categoryId: appliedFilters.categoryId || undefined,
         sortBy: appliedSortBy || undefined,
         searchTitle: appliedSearchTitle || undefined,
+        limit: 20,
+        lastDocId: currentCursor?.id,
+        lastDocValue: currentCursor?.value,
+    }, {
+        refetchOnMountOrArgChange: true, // Always refetch on mount or when args change
     });
+
+    // Debug query state
+    useEffect(() => {
+        console.log('TaskActionScreen - Query state:', {
+            isLoading,
+            isFetching,
+            hasData: !!paginatedData,
+            hasError: !!error,
+            taskCount: paginatedData?.tasks?.length,
+        });
+    }, [isLoading, isFetching, paginatedData, error]);
+
+    // Update tasks when data changes OR when fetching completes
+    useEffect(() => {
+        console.log('TaskActionScreen - paginatedData/fetch changed:', {
+            hasData: !!paginatedData,
+            taskCount: paginatedData?.tasks?.length,
+            currentCursor,
+            lastFetchedCursor: lastFetchedCursorRef.current,
+            isFetching,
+            isLoading
+        });
+
+        // Wait until fetch is complete
+        if (isFetching || isLoading) {
+            console.log('Still fetching/loading, waiting...');
+            return;
+        }
+
+        if (!paginatedData || !paginatedData.tasks) {
+            console.log('No data to process');
+            return;
+        }
+
+        // Determine if we should replace or append based on the last cursor we fetched with
+        const shouldAppend = lastFetchedCursorRef.current !== null &&
+            lastFetchedCursorRef.current?.id !== currentCursor?.id;
+
+        if (shouldAppend) {
+            // Pagination - append new tasks
+            console.log('Appending tasks:', paginatedData.tasks.length);
+            setAllTasks(prev => [...prev, ...paginatedData.tasks]);
+        } else {
+            // First page or refresh - replace all tasks
+            console.log('Setting/Refreshing all tasks:', paginatedData.tasks.length);
+            setAllTasks(paginatedData.tasks);
+        }
+
+        // Update the ref to track what cursor was used for this fetch
+        lastFetchedCursorRef.current = currentCursor;
+
+        // Store cursor for next page
+        if (paginatedData.lastDocId && paginatedData.lastDocValue !== undefined) {
+            setNextCursor({ id: paginatedData.lastDocId, value: paginatedData.lastDocValue });
+        } else {
+            setNextCursor(null);
+        }
+
+        setHasMore(paginatedData.hasMore);
+        setIsLoadingMore(false);
+    }, [paginatedData, isFetching, isLoading]); // Depend on fetching state too
+
+    // Reset pagination when filters change
+    useEffect(() => {
+        lastFetchedCursorRef.current = null; // Reset ref first
+        setAllTasks([]);
+        setCurrentCursor(null);
+        setNextCursor(null);
+        setHasMore(true);
+        setIsLoadingMore(false);
+    }, [appliedFilters, appliedSortBy, appliedSearchTitle]);
+
+    // Debug allTasks state
+    useEffect(() => {
+        console.log('TaskActionScreen - allTasks state changed:', {
+            count: allTasks.length,
+            tasks: allTasks
+        });
+    }, [allTasks]);
+
+    // Refetch when screen comes into focus
+    useFocusEffect(
+        useCallback(() => {
+            refetch();
+        }, [refetch])
+    );
 
     const handleCreateTask = () => {
         navigation.navigate('TaskCreate');
@@ -108,6 +211,13 @@ export const TaskActionScreen = () => {
         setTempSortBy(null);
         setTempSearchTitle('');
     };
+
+    const handleLoadMore = useCallback(() => {
+        if (!isFetching && !isLoadingMore && hasMore && nextCursor) {
+            setIsLoadingMore(true);
+            setCurrentCursor(nextCursor);
+        }
+    }, [isFetching, isLoadingMore, hasMore, nextCursor]);
 
     const getStatusColor = (task: Task) => {
         if (task.status === TaskStatus.COMPLETED) return '#4CAF50';
@@ -214,11 +324,20 @@ export const TaskActionScreen = () => {
             </View>
 
             <FlatList
-                data={tasks}
+                data={allTasks}
                 renderItem={renderItem}
                 keyExtractor={(item) => item.id}
                 contentContainerStyle={styles.listContent}
                 showsVerticalScrollIndicator={false}
+                onEndReached={handleLoadMore}
+                onEndReachedThreshold={0.5}
+                ListFooterComponent={
+                    isLoadingMore ? (
+                        <View style={styles.loadingFooter}>
+                            <ActivityIndicator size="small" color="#000" />
+                        </View>
+                    ) : null
+                }
             />
 
             <TouchableOpacity style={styles.fab} onPress={handleCreateTask}>
@@ -241,7 +360,13 @@ export const TaskActionScreen = () => {
                                 style={styles.searchInput}
                                 placeholder="Enter task title..."
                                 value={tempSearchTitle}
-                                onChangeText={setTempSearchTitle}
+                                onChangeText={(text) => {
+                                    setTempSearchTitle(text);
+                                    if (text.length > 0) {
+                                        setTempFilters({ priority: null, status: null, categoryId: null });
+                                        setTempSortBy(null);
+                                    }
+                                }}
                             />
 
                             <Text style={styles.sectionTitle}>Priority</Text>
@@ -254,10 +379,15 @@ export const TaskActionScreen = () => {
                                             tempFilters.priority === p && styles.filterChipSelected,
                                         ]}
                                         onPress={() =>
-                                            setTempFilters((prev) => ({
-                                                ...prev,
-                                                priority: prev.priority === p ? null : p,
-                                            }))
+                                            setTempFilters((prev) => {
+                                                const newVal = prev.priority === p ? null : p;
+                                                if (newVal) {
+                                                    setTempSearchTitle('');
+                                                    setTempSortBy(null);
+                                                    return { priority: newVal, status: null, categoryId: null };
+                                                }
+                                                return { ...prev, priority: null };
+                                            })
                                         }
                                     >
                                         <Text
@@ -282,10 +412,15 @@ export const TaskActionScreen = () => {
                                             tempFilters.status === s && styles.filterChipSelected,
                                         ]}
                                         onPress={() =>
-                                            setTempFilters((prev) => ({
-                                                ...prev,
-                                                status: prev.status === s ? null : s,
-                                            }))
+                                            setTempFilters((prev) => {
+                                                const newVal = prev.status === s ? null : s;
+                                                if (newVal) {
+                                                    setTempSearchTitle('');
+                                                    setTempSortBy(null);
+                                                    return { priority: null, status: newVal, categoryId: null };
+                                                }
+                                                return { ...prev, status: null };
+                                            })
                                         }
                                     >
                                         <Text
@@ -311,10 +446,15 @@ export const TaskActionScreen = () => {
                                                 tempFilters.categoryId === c.id && styles.filterChipSelected,
                                             ]}
                                             onPress={() =>
-                                                setTempFilters((prev) => ({
-                                                    ...prev,
-                                                    categoryId: prev.categoryId === c.id ? null : c.id,
-                                                }))
+                                                setTempFilters((prev) => {
+                                                    const newVal = prev.categoryId === c.id ? null : c.id;
+                                                    if (newVal) {
+                                                        setTempSearchTitle('');
+                                                        setTempSortBy(null);
+                                                        return { priority: null, status: null, categoryId: newVal };
+                                                    }
+                                                    return { ...prev, categoryId: null };
+                                                })
                                             }
                                         >
                                             <Text
@@ -338,9 +478,14 @@ export const TaskActionScreen = () => {
                                         styles.filterChip,
                                         tempSortBy === 'deadline_asc' && styles.filterChipSelected,
                                     ]}
-                                    onPress={() =>
-                                        setTempSortBy(tempSortBy === 'deadline_asc' ? null : 'deadline_asc')
-                                    }
+                                    onPress={() => {
+                                        const newVal = tempSortBy === 'deadline_asc' ? null : 'deadline_asc';
+                                        setTempSortBy(newVal);
+                                        if (newVal) {
+                                            setTempFilters({ priority: null, status: null, categoryId: null });
+                                            setTempSearchTitle('');
+                                        }
+                                    }}
                                 >
                                     <Text
                                         style={[
@@ -356,9 +501,14 @@ export const TaskActionScreen = () => {
                                         styles.filterChip,
                                         tempSortBy === 'deadline_desc' && styles.filterChipSelected,
                                     ]}
-                                    onPress={() =>
-                                        setTempSortBy(tempSortBy === 'deadline_desc' ? null : 'deadline_desc')
-                                    }
+                                    onPress={() => {
+                                        const newVal = tempSortBy === 'deadline_desc' ? null : 'deadline_desc';
+                                        setTempSortBy(newVal);
+                                        if (newVal) {
+                                            setTempFilters({ priority: null, status: null, categoryId: null });
+                                            setTempSearchTitle('');
+                                        }
+                                    }}
                                 >
                                     <Text
                                         style={[

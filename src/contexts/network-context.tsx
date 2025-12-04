@@ -1,5 +1,8 @@
-import React, { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef, type ReactNode } from 'react';
 import NetInfo, { type NetInfoState } from '@react-native-community/netinfo';
+import { useAppDispatch } from '../store';
+import { taskApi } from '../store/api/taskApi';
+import { categoryApi } from '../store/api/categoryApi';
 
 type NetworkContextType = {
     isConnected: boolean | null;
@@ -15,22 +18,31 @@ type NetworkProviderProps = {
 export const NetworkProvider = ({ children }: NetworkProviderProps) => {
     const [isConnected, setIsConnected] = useState<boolean | null>(null);
     const [netInfoState, setNetInfoState] = useState<NetInfoState | null>(null);
+    const dispatch = useAppDispatch();
+    const previousConnectionState = useRef<boolean | null>(null);
 
     useEffect(() => {
         const unsubscribe = NetInfo.addEventListener((state) => {
-            setIsConnected(state.isConnected);
+            const isInternetReachable = state.isInternetReachable ?? false;
+            const isNetworkConnected = state.isConnected ?? false;
+            const currentlyConnected = isNetworkConnected && isInternetReachable;
+
+            setIsConnected(currentlyConnected);
             setNetInfoState(state);
-            console.log('Network state changed:', {
-                isConnected: state.isConnected,
-                type: state.type,
-                isInternetReachable: state.isInternetReachable,
-            });
+
+            // Sync when coming back online
+            if (previousConnectionState.current === false && currentlyConnected) {
+                dispatch(taskApi.util.invalidateTags(['Task']));
+                dispatch(categoryApi.util.invalidateTags(['Category']));
+            }
+
+            previousConnectionState.current = currentlyConnected;
         });
 
         return () => {
             unsubscribe();
         };
-    }, []);
+    }, [dispatch]);
 
     return (
         <NetworkContext.Provider value={{ isConnected, netInfoState }}>

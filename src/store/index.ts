@@ -19,7 +19,7 @@ import { categoryApi } from './api/categoryApi';
 const persistConfig = {
     key: 'root',
     storage: AsyncStorage,
-    whitelist: ['language'],
+    whitelist: ['language', 'taskApi', 'categoryApi'],
 };
 
 const rootReducer = combineReducers({
@@ -39,6 +39,13 @@ export const store = configureStore({
             },
         }).concat(taskApi.middleware, categoryApi.middleware),
     devTools: true,
+    enhancers: (getDefaultEnhancers) => {
+        if (__DEV__) {
+            const Reactotron = require('../../ReactotronConfig').default;
+            return getDefaultEnhancers().concat(Reactotron.createEnhancer());
+        }
+        return getDefaultEnhancers();
+    },
 });
 
 export const persistor = persistStore(store);

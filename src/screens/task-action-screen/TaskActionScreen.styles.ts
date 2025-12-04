@@ -224,4 +224,9 @@ export const styles = StyleSheet.create({
         borderBottomRightRadius: 16,
         marginTop: -12,
     },
+    loadingFooter: {
+        paddingVertical: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
 });
