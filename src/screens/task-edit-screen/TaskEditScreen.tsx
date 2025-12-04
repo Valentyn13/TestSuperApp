@@ -97,13 +97,10 @@ export const TaskEditScreen = () => {
 
             let imageUrl = task.imageUrl;
 
-            // If user selected a new image
             if (selectedImageUri) {
-                // Delete old image if exists
                 if (task.imageUrl) {
                     await deleteImageFromStorage(task.imageUrl);
                 }
-                // Upload new image
                 const uploadedUrl = await uploadImageToStorage(selectedImageUri, task.id);
                 if (uploadedUrl) {
                     imageUrl = uploadedUrl;

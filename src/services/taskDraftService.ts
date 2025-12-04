@@ -12,7 +12,6 @@ export interface TaskDraft {
 }
 
 export const taskDraftService = {
-    // Save draft to AsyncStorage
     saveDraft: async (draft: TaskDraft): Promise<void> => {
         try {
             const draftWithTimestamp = {
@@ -26,7 +25,6 @@ export const taskDraftService = {
         }
     },
 
-    // Load draft from AsyncStorage
     loadDraft: async (): Promise<TaskDraft | null> => {
         try {
             const draftString = await AsyncStorage.getItem(DRAFT_KEY);
@@ -42,7 +40,6 @@ export const taskDraftService = {
         }
     },
 
-    // Clear draft from AsyncStorage
     clearDraft: async (): Promise<void> => {
         try {
             await AsyncStorage.removeItem(DRAFT_KEY);
@@ -52,7 +49,6 @@ export const taskDraftService = {
         }
     },
 
-    // Check if draft exists
     hasDraft: async (): Promise<boolean> => {
         try {
             const draftString = await AsyncStorage.getItem(DRAFT_KEY);

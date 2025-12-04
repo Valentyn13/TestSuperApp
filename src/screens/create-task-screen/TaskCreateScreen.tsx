@@ -66,16 +66,13 @@ export const TaskCreateScreen = () => {
         },
     });
 
-    // Watch all form values for saving on unmount
     const formValues = watch();
 
-    // Load draft on component mount
     useEffect(() => {
         const loadDraft = async () => {
             try {
                 const draft = await taskDraftService.loadDraft();
                 if (draft) {
-                    // Confirm with user before loading draft
                     Alert.alert(
                         'Draft Found',
                         'You have an unsaved draft. Would you like to continue editing it?',
@@ -115,15 +112,12 @@ export const TaskCreateScreen = () => {
         loadDraft();
     }, [setValue]);
 
-    // Save draft when screen loses focus or app goes to background
     useEffect(() => {
         const saveDraftOnBlur = async () => {
-            // Don't save if draft hasn't been loaded yet or if we're submitting
             if (!isDraftLoaded || isSubmittingRef.current) {
                 return;
             }
 
-            // Only save if there's actual content
             const hasContent = formValues.title.trim().length > 0 ||
                 (formValues.description && formValues.description.trim().length > 0) ||
                 selectedImageUri !== null;
@@ -145,21 +139,17 @@ export const TaskCreateScreen = () => {
             }
         };
 
-        // Save draft when component unmounts (user navigates away or app closes)
         return () => {
             saveDraftOnBlur();
         };
     }, [formValues, selectedImageUri, isDraftLoaded]);
 
-    // Listen for navigation events to save draft before leaving
     useEffect(() => {
         const unsubscribe = navigation.addListener('beforeRemove', async (e) => {
-            // Don't save if submitting
             if (isSubmittingRef.current) {
                 return;
             }
 
-            // Only save if there's actual content
             const hasContent = formValues.title.trim().length > 0 ||
                 (formValues.description && formValues.description.trim().length > 0) ||
                 selectedImageUri !== null;
@@ -220,7 +210,6 @@ export const TaskCreateScreen = () => {
 
             await addTask(newTask).unwrap();
 
-            // Clear draft after successful creation
             await taskDraftService.clearDraft();
 
             navigation.goBack();
