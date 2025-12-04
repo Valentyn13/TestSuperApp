@@ -1,10 +1,15 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, Button } from 'react-native';
 import auth from '@react-native-firebase/auth';
+import { requestPhotoLibraryPermission } from '../helpers';
 
 export const HomeScreen = () => {
     const user = auth().currentUser;
 
+
+    useEffect(() => {
+        requestPhotoLibraryPermission();
+    }, []);
     return (
         <View style={styles.container}>
             <Text style={styles.greeting}>Hello, User!</Text>
