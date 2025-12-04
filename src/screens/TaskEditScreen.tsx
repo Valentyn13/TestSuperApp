@@ -103,12 +103,12 @@ export const TaskEditScreen = () => {
                 ...task,
                 title: data.title,
                 titleLowercase: data.title.toLowerCase(),
-                description: data.description,
+                description: data.description || undefined,
                 priority: data.priority,
                 status: task.status,
-                categoryId: data.categoryId,
+                categoryId: data.categoryId || undefined,
                 deadline: new Date(data.deadline).toISOString(),
-                imageUrl,
+                imageUrl: imageUrl || undefined,
                 updatedAt: new Date().toISOString(),
             };
 

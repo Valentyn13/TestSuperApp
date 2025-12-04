@@ -12,6 +12,7 @@ import { PersistGate } from 'redux-persist/integration/react';
 import { store, persistor } from './src/store';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { useEffect } from 'react';
+import { NetworkProvider } from './src/contexts/network-context';
 
 function App() {
 
@@ -24,9 +25,11 @@ function App() {
   return (
     <Provider store={store}>
       <PersistGate loading={null} persistor={persistor}>
-        <GestureHandlerRootView>
-          <RootNavigator />
-        </GestureHandlerRootView>
+        <NetworkProvider>
+          <GestureHandlerRootView>
+            <RootNavigator />
+          </GestureHandlerRootView>
+        </NetworkProvider>
       </PersistGate>
     </Provider>
   );

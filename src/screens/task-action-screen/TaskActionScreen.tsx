@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -16,6 +16,7 @@ import { useGetCategoriesQuery } from '../../store/api/categoryApi';
 import { Task, TaskStatus, TaskPriority, TaskPriorityType, TaskStatusType } from '../../types';
 import { useNavigation } from '@react-navigation/native';
 import { styles } from './TaskActionScreen.styles';
+import { useNetwork } from '../../contexts/network-context';
 
 type SortOption = 'deadline_asc' | 'deadline_desc' | null;
 
@@ -29,6 +30,7 @@ export const TaskActionScreen = () => {
     const navigation = useNavigation<any>();
     const [updateTask] = useUpdateTaskMutation();
     const { data: categories } = useGetCategoriesQuery();
+    const { isConnected } = useNetwork();
 
     // Applied filters - used for the actual query
     const [appliedFilters, setAppliedFilters] = useState<FilterState>({
@@ -127,7 +129,7 @@ export const TaskActionScreen = () => {
         return (
             <View style={styles.cardWrapper}>
                 <TouchableOpacity
-                    style={styles.card}
+                    style={[styles.card, isExpanded && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, marginBottom: 12 }]}
                     onPress={() => handleEditTask(item)}
                     activeOpacity={0.9}
                 >

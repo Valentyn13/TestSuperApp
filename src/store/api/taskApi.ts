@@ -56,7 +56,24 @@ export const taskApi = createApi({
         addTask: builder.mutation<null, Task>({
             queryFn: async (task) => {
                 try {
-                    await firestore().collection('tasks').doc(task.id).set(task);
+                    // Convert to plain object and remove undefined values (Firestore doesn't support them)
+                    const taskData: any = {
+                        id: task.id,
+                        title: task.title,
+                        status: task.status,
+                        priority: task.priority,
+                        deadline: task.deadline,
+                        createdAt: task.createdAt,
+                        updatedAt: task.updatedAt,
+                    };
+
+                    // Only add optional fields if they are defined
+                    if (task.titleLowercase !== undefined) taskData.titleLowercase = task.titleLowercase;
+                    if (task.description !== undefined) taskData.description = task.description;
+                    if (task.categoryId !== undefined) taskData.categoryId = task.categoryId;
+                    if (task.imageUrl !== undefined) taskData.imageUrl = task.imageUrl;
+
+                    await firestore().collection('tasks').doc(task.id).set(taskData);
                     return { data: null };
                 } catch (error) {
                     return { error: error };
@@ -67,7 +84,24 @@ export const taskApi = createApi({
         updateTask: builder.mutation<null, Task>({
             queryFn: async (task) => {
                 try {
-                    await firestore().collection('tasks').doc(task.id).update(task);
+                    // Convert to plain object and remove undefined values (Firestore doesn't support them)
+                    const taskData: any = {
+                        id: task.id,
+                        title: task.title,
+                        status: task.status,
+                        priority: task.priority,
+                        deadline: task.deadline,
+                        createdAt: task.createdAt,
+                        updatedAt: task.updatedAt,
+                    };
+
+                    // Only add optional fields if they are defined
+                    if (task.titleLowercase !== undefined) taskData.titleLowercase = task.titleLowercase;
+                    if (task.description !== undefined) taskData.description = task.description;
+                    if (task.categoryId !== undefined) taskData.categoryId = task.categoryId;
+                    if (task.imageUrl !== undefined) taskData.imageUrl = task.imageUrl;
+
+                    await firestore().collection('tasks').doc(task.id).update(taskData);
                     return { data: null };
                 } catch (error) {
                     return { error: error };
