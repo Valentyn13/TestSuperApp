@@ -15,3 +15,7 @@
 | If user signed in, app can be opened without an internet(tested on real android device) | ✅ |
 | Testflight Build | ✅ |
 
+## IOS Simulator
+
+https://github.com/user-attachments/assets/a6db90bf-478c-41cd-82b8-abbdb9342a7f
+
