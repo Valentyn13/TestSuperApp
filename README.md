@@ -24,3 +24,6 @@ https://github.com/user-attachments/assets/a6db90bf-478c-41cd-82b8-abbdb9342a7f
 
 https://github.com/user-attachments/assets/0a5d4668-a314-446e-a7e7-29cddeb23dd1
 
+## TestFlight
+
+<img width="1043" height="453" alt="Снимок экрана 2025-12-05 в 09 27 23" src="https://github.com/user-attachments/assets/e7fcce18-88f9-48d5-8428-f7ef9d6eeaf4" />
