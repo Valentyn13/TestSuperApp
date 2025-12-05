@@ -20,7 +20,7 @@ import {
 } from '../../store/api/taskApi';
 import { useGetCategoriesQuery } from '../../store/api/categoryApi';
 import { TaskPriority, Task } from '../../types';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp, NavigationProp } from '@react-navigation/native';
 import { pickImage, uploadImageToStorage, deleteImageFromStorage } from '../../helpers';
 import { styles } from './TaskEditScreen.styles';
 import { Calendar } from 'react-native-calendars';
@@ -48,12 +48,13 @@ type TaskFormData = z.infer<typeof taskSchema>;
 
 type RootStackParamList = {
     TaskEdit: { task: Task };
+    TaskAction: { updatedTask?: Task };
 };
 
 type TaskEditScreenRouteProp = RouteProp<RootStackParamList, 'TaskEdit'>;
 
 export const TaskEditScreen = () => {
-    const navigation = useNavigation();
+    const navigation = useNavigation<NavigationProp<RootStackParamList>>();
     const route = useRoute<TaskEditScreenRouteProp>();
     const { task } = route.params;
 
@@ -121,7 +122,7 @@ export const TaskEditScreen = () => {
             };
 
             await updateTask(updatedTask).unwrap();
-            navigation.goBack();
+            navigation.navigate('TaskAction', { updatedTask });
         } catch (error) {
             Alert.alert('Error', 'Failed to update task');
             console.error(error);

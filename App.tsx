@@ -14,6 +14,10 @@ import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { useEffect } from 'react';
 import { NetworkProvider } from './src/contexts/network-context';
 import BottomSheetProvider from './src/contexts/bottom-sheet-context';
+import { LogBox } from 'react-native';
+LogBox.ignoreLogs(['Warning: ...']); // Ignore log notification by message
+LogBox.ignoreAllLogs();//Ignore all log notifications
+
 
 function App() {
 

@@ -10,7 +10,7 @@ import {
 import { useGetTasksPaginatedQuery, useUpdateTaskMutation } from '../../store/api/taskApi';
 import { useGetCategoriesQuery } from '../../store/api/categoryApi';
 import { Task, TaskStatus, TaskPriorityType, TaskStatusType } from '../../types';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
 import { styles } from './TaskActionScreen.styles';
 import { useBottomSheet } from '../../contexts/bottom-sheet-context';
 import { TaskFilters } from '../../components/task-filters/TaskFilters';
@@ -69,7 +69,6 @@ export const TaskActionScreen = () => {
             isLoading
         });
 
-        // Wait until fetch is complete
         if (isFetching || isLoading) {
             console.log('Still fetching/loading, waiting...');
             return;
@@ -84,7 +83,16 @@ export const TaskActionScreen = () => {
         const shouldAppend = currentCursor !== null;
 
         if (shouldAppend) {
-            setAllTasks(prev => [...prev, ...paginatedData.tasks]);
+            setAllTasks(prev => {
+                const incomingTasks = paginatedData.tasks;
+                const incomingMap = new Map(incomingTasks.map(t => [t.id, t]));
+
+                const updatedPrev = prev.map(t => incomingMap.has(t.id) ? incomingMap.get(t.id)! : t);
+
+                const newItems = incomingTasks.filter(t => !prev.some(p => p.id === t.id));
+
+                return [...updatedPrev, ...newItems];
+            });
         } else {
             setAllTasks(paginatedData.tasks);
         }
@@ -101,9 +109,8 @@ export const TaskActionScreen = () => {
         setIsLoadingMore(false);
     }, [paginatedData, isFetching, isLoading, currentCursor]);
 
-    // Reset pagination when filters change
     useEffect(() => {
-        lastFetchedCursorRef.current = null; // Reset ref first
+        lastFetchedCursorRef.current = null;
         setAllTasks([]);
         setCurrentCursor(null);
         setNextCursor(null);
@@ -111,10 +118,20 @@ export const TaskActionScreen = () => {
         setIsLoadingMore(false);
     }, [appliedFilters, appliedSortBy, appliedSearchTitle]);
 
+    const route = useRoute<any>();
+
     useFocusEffect(
         useCallback(() => {
+            if (route.params?.updatedTask) {
+                const updatedTask = route.params.updatedTask;
+                setAllTasks(prev => prev.map(t =>
+                    t.id === updatedTask.id ? updatedTask : t
+                ));
+
+                navigation.setParams({ updatedTask: undefined });
+            }
             refetch();
-        }, [refetch])
+        }, [refetch, route.params?.updatedTask, navigation])
     );
 
     const handleCreateTask = () => {
@@ -134,6 +151,11 @@ export const TaskActionScreen = () => {
             task.status === TaskStatus.COMPLETED
                 ? TaskStatus.UNCOMPLETED
                 : TaskStatus.COMPLETED;
+
+        // Optimistically update local state
+        setAllTasks(prev => prev.map(t =>
+            t.id === task.id ? { ...t, status: newStatus } : t
+        ));
 
         await updateTask({
             ...task,
