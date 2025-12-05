@@ -91,14 +91,8 @@ export const taskApi = createApi({
                     if (task.categoryId !== undefined) taskData.categoryId = task.categoryId;
                     if (task.imageUrl !== undefined) taskData.imageUrl = task.imageUrl;
 
-                    const netInfo = await NetInfo.fetch();
-                    const isConnected = netInfo.isConnected && netInfo.isInternetReachable;
-
-                    const promise = firestore().collection('tasks').doc(task.id).set(taskData);
-
-                    if (isConnected) {
-                        await promise;
-                    }
+                    // Don't await - let Firebase write to cache and sync in background
+                    firestore().collection('tasks').doc(task.id).set(taskData);
 
                     return { data: null };
                 } catch (error: any) {
@@ -132,14 +126,8 @@ export const taskApi = createApi({
                     if (task.categoryId !== undefined) taskData.categoryId = task.categoryId;
                     if (task.imageUrl !== undefined) taskData.imageUrl = task.imageUrl;
 
-                    const netInfo = await NetInfo.fetch();
-                    const isConnected = netInfo.isConnected && netInfo.isInternetReachable;
-
-                    const promise = firestore().collection('tasks').doc(task.id).update(taskData);
-
-                    if (isConnected) {
-                        await promise;
-                    }
+                    // Don't await - let Firebase write to cache and sync in background
+                    firestore().collection('tasks').doc(task.id).update(taskData);
 
                     return { data: null };
                 } catch (error: any) {
@@ -156,14 +144,8 @@ export const taskApi = createApi({
         deleteTask: builder.mutation<null, string>({
             queryFn: async (taskId) => {
                 try {
-                    const netInfo = await NetInfo.fetch();
-                    const isConnected = netInfo.isConnected && netInfo.isInternetReachable;
-
-                    const promise = firestore().collection('tasks').doc(taskId).delete();
-
-                    if (isConnected) {
-                        await promise;
-                    }
+                    // Don't await - let Firebase write to cache and sync in background
+                    firestore().collection('tasks').doc(taskId).delete();
 
                     return { data: null };
                 } catch (error: any) {
